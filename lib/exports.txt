@@ -1,0 +1,87 @@
+Microsoft (R) COFF/PE Dumper Version 14.34.31935.0
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+
+Dump of file D:\a\CoolProp\CoolProp\build\Release\CoolProp.dll
+
+File Type: DLL
+
+  Section contains the following exports for CoolProp.dll
+
+    00000000 characteristics
+    FFFFFFFF time date stamp
+        0.00 version
+           1 ordinal base
+          58 number of functions
+          58 number of names
+
+    ordinal hint RVA      name
+
+          1    0 0019AAE0 AbstractState_all_critical_points
+          2    1 0019AC80 AbstractState_backend_name
+          3    2 0019ADC0 AbstractState_build_phase_envelope
+          4    3 0019AE90 AbstractState_build_spinodal
+          5    4 0019AED0 AbstractState_factory
+          6    5 0019B190 AbstractState_first_partial_deriv
+          7    6 0019B1F0 AbstractState_first_saturation_deriv
+          8    7 0019B240 AbstractState_fluid_names
+          9    8 0019B470 AbstractState_free
+         10    9 0019B5D0 AbstractState_get_mole_fractions
+         11    A 0019B800 AbstractState_get_mole_fractions_satState
+         12    B 0019BB70 AbstractState_get_phase_envelope_data
+         13    C 0019BF10 AbstractState_get_phase_envelope_data_checkedMemory
+         14    D 0019C220 AbstractState_get_spinodal_data
+         15    E 0019C380 AbstractState_keyed_output
+         16    F 0019C3D0 AbstractState_keyed_output_satState
+         17   10 0019C640 AbstractState_set_binary_interaction_double
+         18   11 0019C750 AbstractState_set_cubic_alpha_C
+         19   12 0019C870 AbstractState_set_fluid_parameter_double
+         20   13 0019C970 AbstractState_set_fractions
+         21   14 0019CB00 AbstractState_specify_phase
+         22   15 0019CBE0 AbstractState_unspecify_phase
+         23   16 0019CC20 AbstractState_update
+         24   17 0019CC80 AbstractState_update_and_1_out
+         25   18 0019CD50 AbstractState_update_and_5_out
+         26   19 0019CE90 AbstractState_update_and_common_out
+         27   1A 0019CFC0 F2K
+         28   1B 0019CFE0 HAProps
+         29   1C 0019D2E0 HAPropsSI
+         30   1D 0019D570 K2F
+         31   1E 0019D590 PhaseSI
+         32   1F 0019D8D0 Props
+         33   20 0019DB40 Props1
+         34   21 0019DC40 Props1SI
+         35   22 0019DCE0 Props1SImulti
+         36   23 0019E480 PropsS
+         37   24 0019E490 PropsSI
+         38   25 0019E710 PropsSImulti
+         39   26 0019F440 add_fluids_as_JSON
+         40   27 0019F590 cair_sat
+         41   28 0019F5C0 get_debug_level
+         42   29 0019F5D0 get_fluid_param_string
+         43   2A 0019F810 get_global_param_string
+         44   2B 0019F9B0 get_input_pair_index
+         45   2C 0019FA70 get_param_index
+         46   2D 0019FB30 get_parameter_information_string
+         47   2E 0019FD70 haprops_
+         48   2F 0019FDC0 hapropssi_
+         49   30 0019FE10 propssi_
+         50   31 0019FE50 redirect_stdout
+         51   32 0019FE90 saturation_ancillary
+         52   33 001A00D0 set_config_bool
+         53   34 001A0190 set_config_double
+         54   35 001A0250 set_config_string
+         55   36 001A03A0 set_debug_level
+         56   37 001A03B0 set_departure_functions
+         57   38 001A0470 set_reference_stateD
+         58   39 001A0580 set_reference_stateS
+
+  Summary
+
+       18000 .data
+       10000 .pdata
+      1E8000 .rdata
+        4000 .reloc
+        1000 .rsrc
+      209000 .text
+        1000 _RDATA
