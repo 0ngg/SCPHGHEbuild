@@ -1,4 +1,4 @@
-#include"temp_struct_cfd.h"
+#include"scphghe/temp_struct_cfd.h"
 #include<conio.h>
 
 int main(int argc, char** argv)
@@ -16,6 +16,9 @@ int main(int argc, char** argv)
     std::cout << "User obj. successfully built." << std::endl;
     cfd::scheme* main_scheme(new cfd::scheme(mesh_arg, main_user));
     std::cout << "Scheme obj. successfully built." << std::endl;
+    cfd::exports* main_export(new cfd::exports(output_arg, mesh_arg, main_scheme));
+    std::cout << "Export obj. successfully built." << std::endl;
+    
     _getch();
     return 0;
 };

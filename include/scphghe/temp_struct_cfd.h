@@ -50,7 +50,6 @@ struct axes
     coor axes_to_coor(int, int);
     double axes_to_val(int, int);
 };
-
 // STRUCT CFD
 // user
 class user
@@ -65,12 +64,11 @@ class user
     make<make<make<double>::map_int>::map_str>::map_str cell_source; // .... - time step - value
     user() {};
     user(double, double, double, std::string, std::string);
-    void update_source(int, scheme*);
+    void update_source(int, scheme*&);
     private:
     void read_source_csv(std::string);
     void read_solid_prop_csv(std::string);
 };
-
 // scheme
 class scheme
 {
@@ -83,7 +81,7 @@ class scheme
     make<double>::sp_mat rho_v_sf; // fluid, fc
     make<double>::map_int phi_v; // fluid, f
     scheme() {};
-    scheme(std::string, user*);
+    scheme(std::string, user*&);
 };
 struct finfo
 {
@@ -135,9 +133,9 @@ class pinfo
     make<make<double>::map_int>::map_str k; // cell-face, solid -> constant
     make<make<double>::map_int>::map_str eps; // face, solid(s2s -> glass/absorber, hamb -> glass/soil ids -> inline! (0.8)) -> constant
     pinfo() {};
-    pinfo(minfo&, user*);
+    pinfo(minfo&, user*&);
     private:
-    void make_pinfo(minfo&, user*);
+    void make_pinfo(minfo&, user*&);
 };
 class winfo
 {
@@ -163,6 +161,7 @@ struct vinfo
     make<make<coor>::map_int>::map_str prev_cgrad;
     make<make<coor>::map_int>::map_str prev_fgrad;
     vinfo() {};
+    vinfo operator()(vinfo&);
     vinfo(make<std::string>::vec, minfo&, double);
     void make_vinfo(make<std::string>::vec, minfo&, double);
 };
@@ -179,5 +178,180 @@ struct binfo
     make<make<double>::map_str>::map_str cell_value;
     binfo() {};
     binfo(make<make<double>::map_int>::map_str&, make<make<double>::map_str>::map_str&);
+};
+// export
+class exports
+{
+    public:
+    // common information
+    std::string output_name;
+    std::string mesh_name;
+    int number_of_cells;
+    /* map_str names: P, u, v, w, k, e, T*/
+    // converged values
+    make<make<double>::comp_str>::map_int cell_export;
+    make<make<double>::comp_str>::map_int face_export;
+    /* map_str names: u, v, w, k, e, T*/
+    // final numerical errors (at converged iteration)
+    // BiCGSTAB estimated numerical errors
+    make<double>::comp_str err_export;
+    // converged residuals for each time step of each variable of interest
+    make<double>::comp_str res_export;
+    // time till convergence for each time step
+    make<long long>::vec time_export;
+    // number of overarching loops (all, SIMPLE-turbulence-energy) needed till all equation converged
+    make<int>::vec iter_export;
+    exports() {};
+    exports(std::string, std::string, scheme*&);
+    void update_export(scphghe*&, scheme*&, make<double>::map_str,
+                       make<double>::map_str, long long, int);
+    private:
+    void export_to_sql(scheme*& scheme_ref);
+};
+// linear
+class linear
+{
+    public:
+    vinfo* value;
+    make<make<make<double>::map_int>::map_str>::map_str gamma; // cc
+    make<make<double>::sp_mat>::map_str lhs_cc;
+    make<make<double>::sp_mat>::map_str lhs_fc;
+    make<make<double>::sp_mat>::map_str rhs_cc;
+    make<make<double>::sp_mat>::map_str rhs_fc;
+    linear() {};
+    virtual void update_linear();
+    virtual void calc_wall();
+    protected:
+    virtual void make_linear();
+    virtual void calc_gamma();
+    virtual void calc_lhs();
+    virtual void calc_rhs();
+    virtual void calc_bound_lhs();
+    virtual void calc_bound_rhs();
+};
+class pcorrect : public linear
+{
+    public:
+    pcorrect() {};
+    pcorrect(scheme*&, user*&);
+    void update_linear(scheme*&, momentum*&, momentum*&, momentum*&);
+    void update_correction(scheme*&, momentum*&, momentum*&, momentum*&);
+    private:
+    void make_linear(scheme*&, user*&);
+    void calc_lhs(scheme*&, momentum*&, momentum*&, momentum*&);
+    void calc_rhs(scheme*&, momentum*&, momentum*&, momentum*&);
+    void calc_bound_lhs(int, int, std::string, int, scheme*&, double);
+};
+class momentum : public linear
+{
+    public:
+    int axis;
+    momentum() {};
+    momentum(scheme*&, int);
+    void update_linear(scheme*&, turb_k*&, momentum*&, momentum*&);
+    void calc_wall(scheme*&, momentum*&, momentum*&);
+    private:
+    void make_linear(scheme*&, int);
+    void calc_gamma(scheme*&);
+    void calc_lhs(scheme*&, momentum*&, momentum*&);
+    void calc_rhs(scheme*&, turb_k*&, momentum*&, momentum*&);
+    void calc_bound_lhs(int, int, std::string, int, scheme*&, momentum*&, momentum*&);
+    void calc_bound_rhs(int, int, std::string, int, scheme*&, momentum*&, momentum*&);
+};
+class turb_k : public linear
+{
+    public:
+    turb_k() {};
+    turb_k(scheme*&);
+    void update_linear(scheme*&, turb_e*&, momentum*&, momentum*&, momentum*&);
+    void calc_wall(scheme*&, turb_e*&);
+    private:
+    void make_linear(scheme*&);
+    void calc_gamma(scheme*&);
+    void calc_lhs(scheme*&, momentum*&, momentum*&, momentum*&);
+    void calc_rhs(scheme*&, turb_e*&, momentum*&, momentum*&, momentum*&);
+    void calc_bound_lhs(int, int, std::string, int, scheme*&, momentum*&, momentum*&, momentum*&);
+    void calc_bound_rhs(int, int, std::string, int, scheme*&, momentum*&, momentum*&, momentum*&);
+};
+class turb_e : public linear
+{
+    public:
+    turb_e() {};
+    turb_e(scheme*&);
+    void update_linear(scheme*&, turb_k*&, momentum*&, momentum*&, momentum*&);
+    void calc_wall(scheme*&);
+    private:
+    void make_linear(scheme*&);
+    void calc_gamma(scheme*&);
+    void calc_lhs(scheme*&, momentum*&, momentum*&, momentum*&);
+    void calc_rhs(scheme*&, turb_k*&, momentum*&, momentum*&, momentum*&);
+    void calc_bound_lhs(int, int, std::string, int, scheme*&, momentum*&, momentum*&, momentum*&);
+    void calc_bound_rhs(int, int, std::string, int, scheme*&, momentum*&, momentum*&, momentum*&);
+};
+class energy : public linear
+{
+    public:
+    energy() {};
+    energy(scheme*&, user*&);
+    void update_linear(scheme*&, turb_k*&, momentum*&, momentum*&, momentum*&, double);
+    void calc_wall(scheme*&, double);
+    private:
+    // commons
+    void make_linear(scheme*&, user*&);
+    void calc_gamma(scheme*&, double);
+    void calc_lhs(scheme*&, turb_k*&, momentum*&, momentum*&, momentum*&, double);
+    void calc_rhs(scheme*&, momentum*&, momentum*&, momentum*&, double);    
+    void calc_bound_lhs(int, int, std::string, int, scheme*&, std::string, momentum*&, momentum*&, momentum*&, double);
+    void calc_bound_rhs(int, int, std::string, int, scheme*&, std::string, momentum*&, momentum*&, momentum*&, double);
+};
+class s2s : public linear
+{
+    public:
+    s2s() {};
+    s2s(scheme*&);
+    void update_linear(scheme*&, energy*&);
+    void update_source_s2s(scheme*&);
+    private:
+    void make_linear(scheme*&);
+    void calc_lhs(scheme*&);
+    void calc_rhs(scheme*&, energy*&);
+};
+// solver
+template <class V>
+struct solver
+{
+    V* eq;
+    make<double>::sp_mat lhs;
+    Eigen::VectorXd rhs;
+    make<double>::sp_mat prev_lhs;
+    Eigen::VectorXd prev_rhs;
+    solver() {};
+    solver(V*, scheme*&, int);
+};
+// scphghe
+class scphghe
+{
+    public:
+    double step_length;
+    double under_relax;
+    double min_residual;
+    int max_iter;
+    int current_time;
+    solver<momentum>* solv_u;
+    solver<momentum>* solv_v;
+    solver<momentum>* solv_w;
+    solver<pcorrect>* solv_pcor;
+    solver<turb_k>* solv_k;
+    solver<turb_e>* solv_e;
+    solver<energy>* solv_energy;
+    solver<s2s>* solv_s2s;
+    scphghe() {};
+    scphghe(scheme*&, user*&, double, double, double, int);
+    void iterate(scheme*&, exports*&, user*&);
+    private:
+    void make_scphghe(scheme*&, user*&, double, double, double, int);
+    int SIMPLE_loop(scheme*&, bool, make<double>::map_str*, make<double>::map_str*);
+    int turb_loop(scheme*&, bool, make<double>::map_str*, make<double>::map_str*);
+    int energy_loop(scheme*&, double, bool, make<double>::map_str*, make<double>::map_str*);
 };
 };

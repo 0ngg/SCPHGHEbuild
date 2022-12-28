@@ -8,4 +8,8 @@ struct pinfo;
 struct winfo;
 struct vinfo;
 struct binfo;
+class momentum;
+class turb_k;
+class turb_e;
+class scphghe;
 };
