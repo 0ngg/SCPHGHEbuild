@@ -1409,23 +1409,39 @@ void exports::update_export(scphghe*& scphghe_ref, scheme*& scheme_ref, make<dou
 };
 void exports::export_to_sql(scheme*& scheme_ref)
 {
+    // load, export, and definition of function sqlite3_open(), sqlite3_exec(), sqlite3_close() from sqlite3.DLL
+    // Define DLL functions
+    typedef int (WINAPI *sqlite3_open)(const char *filename, sqlite3 **ppDb);
+    typedef int (WINAPI *sqlite3_exec)(sqlite3*, const char *sql, int (*callback)(void*,int,char**,char**), void *, char **errmsg);
+    typedef int (WINAPI *sqlite3_close)(sqlite3*);
+    // addresses
+    sqlite3_open sqlite3_openAddress;
+    sqlite3_exec sqlite3_execAddress;
+    sqlite3_close sqlite3_closeAddress;
+    // load DLL; change this path as needed
+    HINSTANCE sqlite3Dll = LoadLibraryA("C:\\Users\\LENOVO\\Documents\\TA\\sandbox\\make_scheme_fix\\lib\\sqlite3.dll");
+    
+    sqlite3_openAddress = (sqlite3_open) GetProcAddress(sqlite3Dll, "sqlite3_open"); // change address (check sqlite3.h)
+    sqlite3_execAddress = (sqlite3_exec) GetProcAddress(sqlite3Dll, "sqlite3_exec");
+    sqlite3_closeAddress = (sqlite3_close) GetProcAddress(sqlite3Dll, "sqlite3_close");
+
     sqlite3* database_p;
     int exit = 0;
     char* message_err;
     // open
-    exit = sqlite3_open(this->output_name.c_str(), &database_p);
+    exit = (*sqlite3_openAddress) (this->output_name.c_str(), &database_p);
     // sql table templates
     // time step-wise values stored as string with comma limiter
     std::string commons_template =  "CREATE TABLE COMMONS("
                                     "NAME       TEXT            NOT NULL,"
                                     "N_CELLS    INT            NOT NULL);";
-    exit = sqlite3_exec(database_p, commons_template.c_str(), NULL, 0, &message_err);
+    exit = (*sqlite3_execAddress) (database_p, commons_template.c_str(), NULL, 0, &message_err);
     std::string node_template = "CREATE TABLE NODE("
                                 "ID         INT     PRIMARY KEY NOT NULL,"
                                 "X          REAL               NOT NULL,"
                                 "Y          REAL               NOT NULL,"
                                 "Z          REAL               NOT NULL);";
-    exit = sqlite3_exec(database_p, node_template.c_str(), NULL, 0, &message_err);
+    exit = (*sqlite3_execAddress) (database_p, node_template.c_str(), NULL, 0, &message_err);
     std::string face_template = "CREATE TABLE FACE("
                                 "ID         INT     PRIMARY KEY NOT NULL,"
                                 "BOUNDARY   TEXT                NOT NULL,"
@@ -1438,7 +1454,7 @@ void exports::export_to_sql(scheme*& scheme_ref)
                                 "K          TEXT                NOT NULL,"
                                 "E          TEXT                NOT NULL,"
                                 "T          TEXT                NOT NULL);";
-    exit = sqlite3_exec(database_p, face_template.c_str(), NULL, 0, &message_err);
+    exit = (*sqlite3_execAddress) (database_p, face_template.c_str(), NULL, 0, &message_err);
     std::string cell_template = "CREATE TABLE CELL("
                                 "ID         INT     PRIMARY KEY NOT NULL,"
                                 "DOMAIN     TEXT                NOT NULL,"
@@ -1451,7 +1467,7 @@ void exports::export_to_sql(scheme*& scheme_ref)
                                 "K          TEXT                NOT NULL,"
                                 "E          TEXT                NOT NULL,"
                                 "T          TEXT                NOT NULL);";
-    exit = sqlite3_exec(database_p, cell_template.c_str(), NULL, 0, &message_err);
+    exit = (*sqlite3_execAddress) (database_p, cell_template.c_str(), NULL, 0, &message_err);
     std::string err_template =  "CREATE TABLE ERROR("
                                 "U          TEXT                NOT NULL,"
                                 "V          TEXT                NOT NULL,"
@@ -1459,7 +1475,7 @@ void exports::export_to_sql(scheme*& scheme_ref)
                                 "K          TEXT                NOT NULL,"
                                 "E          TEXT                NOT NULL,"
                                 "T          TEXT                NOT NULL);";
-    exit = sqlite3_exec(database_p, err_template.c_str(), NULL, 0, &message_err);
+    exit = (*sqlite3_execAddress) (database_p, err_template.c_str(), NULL, 0, &message_err);
     std::string res_template =  "CREATE TABLE RESIDUAL("
                                 "U          TEXT                NOT NULL,"
                                 "V          TEXT                NOT NULL,"
@@ -1467,16 +1483,16 @@ void exports::export_to_sql(scheme*& scheme_ref)
                                 "K          TEXT                NOT NULL,"
                                 "E          TEXT                NOT NULL,"
                                 "T          TEXT                NOT NULL);";
-    exit = sqlite3_exec(database_p, res_template.c_str(), NULL, 0, &message_err);
+    exit = (*sqlite3_execAddress) (database_p, res_template.c_str(), NULL, 0, &message_err);
     std::string time_iter_template = "CREATE TABLE TIME_ITER("
                                      "TIME       TEXT                NOT NULL,"
                                      "ITER       TEXT                NOT NULL);";
-    exit = sqlite3_exec(database_p, time_iter_template.c_str(), NULL, 0, &message_err);
+    exit = (*sqlite3_execAddress) (database_p, time_iter_template.c_str(), NULL, 0, &message_err);
     // commons
     std::string commons_input("INSERT INTO COMMONS VALUES(");
     commons_input += "'" + this->mesh_name + "'" + ", ";
     commons_input += std::to_string(this->number_of_cells) + ");";
-    exit = sqlite3_exec(database_p, commons_input.c_str(), NULL, 0, &message_err);
+    exit = (*sqlite3_execAddress) (database_p, commons_input.c_str(), NULL, 0, &message_err);
     // nodes
     for(std::pair<int, coor> entry : scheme_ref->mesh->nodes)
     {
@@ -1485,7 +1501,7 @@ void exports::export_to_sql(scheme*& scheme_ref)
         nodes_input += std::to_string(entry.second(0)) + ", ";
         nodes_input += std::to_string(entry.second(1)) + ", ";
         nodes_input += std::to_string(entry.second(2)) + ");";
-        exit = sqlite3_exec(database_p, nodes_input.c_str(), NULL, 0, &message_err);
+        exit = (*sqlite3_execAddress) (database_p, nodes_input.c_str(), NULL, 0, &message_err);
     };
     // face
     for(std::pair<int, finfo> entry_face : scheme_ref->mesh->faces)
@@ -1502,7 +1518,7 @@ void exports::export_to_sql(scheme*& scheme_ref)
         faces_input += vec_to_str<make<double>::vec>(this->face_export[entry_face.first]["k"]) + ", ";
         faces_input += vec_to_str<make<double>::vec>(this->face_export[entry_face.first]["e"]) + ", ";
         faces_input += vec_to_str<make<double>::vec>(this->face_export[entry_face.first]["T"]) + ");";
-        exit = sqlite3_exec(database_p, faces_input.c_str(), NULL, 0, &message_err);
+        exit = (*sqlite3_execAddress) (database_p, faces_input.c_str(), NULL, 0, &message_err);
     };
     // cell
     for(std::pair<int, cinfo> entry_cell : scheme_ref->mesh->cells)
@@ -1519,7 +1535,7 @@ void exports::export_to_sql(scheme*& scheme_ref)
         cells_input += vec_to_str<make<double>::vec>(this->cell_export[entry_cell.first]["k"]) + ", ";
         cells_input += vec_to_str<make<double>::vec>(this->cell_export[entry_cell.first]["e"]) + ", ";
         cells_input += vec_to_str<make<double>::vec>(this->cell_export[entry_cell.first]["T"]) + ");";
-        exit = sqlite3_exec(database_p, cells_input.c_str(), NULL, 0, &message_err);
+        exit = (*sqlite3_execAddress) (database_p, cells_input.c_str(), NULL, 0, &message_err);
     };
     // err
     std::string err_input("INSERT INTO ERROR VALUES(");
@@ -1529,7 +1545,7 @@ void exports::export_to_sql(scheme*& scheme_ref)
     err_input += vec_to_str<make<double>::vec>(this->err_export["k"]) + ", ";
     err_input += vec_to_str<make<double>::vec>(this->err_export["e"]) + ", ";
     err_input += vec_to_str<make<double>::vec>(this->err_export["T"]) + ");";
-    exit = sqlite3_exec(database_p, err_input.c_str(), NULL, 0, &message_err);
+    exit = (*sqlite3_execAddress) (database_p, err_input.c_str(), NULL, 0, &message_err);
     // res
     std::string res_input("INSERT INTO RESIDUAL VALUES(");
     res_input += vec_to_str<make<double>::vec>(this->res_export["u"]) + ", ";
@@ -1538,14 +1554,15 @@ void exports::export_to_sql(scheme*& scheme_ref)
     res_input += vec_to_str<make<double>::vec>(this->res_export["k"]) + ", ";
     res_input += vec_to_str<make<double>::vec>(this->res_export["e"]) + ", ";
     res_input += vec_to_str<make<double>::vec>(this->res_export["T"]) + ");";
-    exit = sqlite3_exec(database_p, res_input.c_str(), NULL, 0, &message_err);
+    exit = (*sqlite3_execAddress) (database_p, res_input.c_str(), NULL, 0, &message_err);
     // time_iter
     std::string time_iter_input("INSERT INTO TIME_ITER VALUES(");
     time_iter_input += vec_to_str<make<long long>::vec>(this->time_export) + ", ";
     time_iter_input += vec_to_str<make<int>::vec>(this->iter_export) + ");";
-    exit = sqlite3_exec(database_p, time_iter_input.c_str(), NULL, 0, &message_err);
+    exit = (*sqlite3_execAddress) (database_p, time_iter_input.c_str(), NULL, 0, &message_err);
     // close
-    sqlite3_close(database_p);
+    (*sqlite3_closeAddress) (database_p);
+    FreeLibrary(sqlite3Dll);
 };
 
 // other linear func
