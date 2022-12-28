@@ -14,7 +14,7 @@
 #include<mshio/mshio.h>
 #include<Eigen/Dense>
 #include<Eigen/Sparse>
-#include"sqlite3.h"
+#include"sqlite/sqlite3.h"
 #include"scphghe/temp_fwd_cfd.h"
 
 using namespace Eigen;
