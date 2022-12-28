@@ -448,6 +448,12 @@ minfo::minfo(mshio::MshSpec spec)
 };
 void minfo::make_minfo(mshio::MshSpec spec)
 {
+    // make map int of physical group name
+    make<std::string>::map_int phys_name_map;
+    for(const auto& group: spec.physical_groups)
+    {
+        phys_name_map.insert({group.tag, group.name});
+    };
     make<coor>::map_int nodes;
     make<finfo>::map_int faces;
     make<cinfo>::map_int cells;
@@ -475,6 +481,8 @@ void minfo::make_minfo(mshio::MshSpec spec)
             {
                 finfo face__;
                 make<int>::vec fnode__{int(block.data[j * (n+1) - 1]), int(block.data[j * (n+1)]), int(block.data[j * (n+1) + 1])};
+                face__.fnode = fnode__; face__.fboundary = phys_name_map[tag];
+                faces.insert({block.data[j * (n+1)] - 1, face__});
             };
             case 3:
             for(int j = 0; j < block.num_elements_in_block; j++)
@@ -501,7 +509,7 @@ void minfo::make_minfo(mshio::MshSpec spec)
                         break;
                     };
                 };
-                cell__.cnode = cnode__; cell__.cface = cface__; 
+                cell__.cnode = cnode__; cell__.cface = cface__; cell__.cdomain = phys_name_map[tag];
                 cells.insert({block.data[j * (n+1)] - 1, cell__});
             };
             default:
@@ -1480,50 +1488,38 @@ void exports::export_to_sql(scheme*& scheme_ref)
         exit = sqlite3_exec(database_p, nodes_input.c_str(), NULL, 0, &message_err);
     };
     // face
-    for(std::pair<std::string, make<make<int>::vec>::map_int> entry_str : scheme_ref->mesh->fid)
+    for(std::pair<int, finfo> entry_face : scheme_ref->mesh->faces)
     {
-        for(std::pair<int, make<int>::vec> entry_int : entry_str.second)
-        {
-            for(auto i = entry_int.second.begin(); i != entry_int.second.end(); i++)
-            {
-                std::string faces_input("INSERT INTO FACES VALUES(");
-                faces_input += std::to_string(*i) + ", ";
-                faces_input += "'" + entry_str.first + "_" + std::to_string(entry_int.first) + "'" + ", ";
-                faces_input += vec_to_str<make<int>::vec>(scheme_ref->mesh->faces[*i].fnode) + ", ";
-                faces_input += std::to_string(scheme_ref->mesh->faces[*i].farea) + ", ";
-                faces_input += vec_to_str<make<double>::vec>(this->face_export[*i]["P"]) + ", ";
-                faces_input += vec_to_str<make<double>::vec>(this->face_export[*i]["u"]) + ", ";
-                faces_input += vec_to_str<make<double>::vec>(this->face_export[*i]["v"]) + ", ";
-                faces_input += vec_to_str<make<double>::vec>(this->face_export[*i]["w"]) + ", ";
-                faces_input += vec_to_str<make<double>::vec>(this->face_export[*i]["k"]) + ", ";
-                faces_input += vec_to_str<make<double>::vec>(this->face_export[*i]["e"]) + ", ";
-                faces_input += vec_to_str<make<double>::vec>(this->face_export[*i]["T"]) + ");";
-                exit = sqlite3_exec(database_p, faces_input.c_str(), NULL, 0, &message_err);
-            };
-        };
+        std::string faces_input("INSERT INTO FACES VALUES(");
+        faces_input += std::to_string(entry_face.first) + ", ";
+        faces_input += "'" + entry_face.second.fboundary + "'" + ", ";
+        faces_input += vec_to_str<make<int>::vec>(entry_face.second.fnode) + ", ";
+        faces_input += std::to_string(entry_face.second.farea) + ", ";
+        faces_input += vec_to_str<make<double>::vec>(this->face_export[entry_face.first]["P"]) + ", ";
+        faces_input += vec_to_str<make<double>::vec>(this->face_export[entry_face.first]["u"]) + ", ";
+        faces_input += vec_to_str<make<double>::vec>(this->face_export[entry_face.first]["v"]) + ", ";
+        faces_input += vec_to_str<make<double>::vec>(this->face_export[entry_face.first]["w"]) + ", ";
+        faces_input += vec_to_str<make<double>::vec>(this->face_export[entry_face.first]["k"]) + ", ";
+        faces_input += vec_to_str<make<double>::vec>(this->face_export[entry_face.first]["e"]) + ", ";
+        faces_input += vec_to_str<make<double>::vec>(this->face_export[entry_face.first]["T"]) + ");";
+        exit = sqlite3_exec(database_p, faces_input.c_str(), NULL, 0, &message_err);
     };
     // cell
-    for(std::pair<std::string, make<make<int>::vec>::map_str> entry_str1 : scheme_ref->mesh->cid)
+    for(std::pair<int, cinfo> entry_cell : scheme_ref->mesh->cells)
     {
-        for(std::pair<std::string, make<int>::vec> entry_str2 : entry_str1.second)
-        {
-            for(auto i = entry_str2.second.begin(); i != entry_str2.second.end(); i++)
-            {
-                std::string cells_input("INSERT INTO CELLS VALUES(");
-                cells_input += std::to_string(*i) + ", ";
-                cells_input += "'" + entry_str2.first + "'" + ", ";
-                cells_input += vec_to_str<make<int>::vec>(scheme_ref->mesh->cells[*i].cnode) + ", ";
-                cells_input += std::to_string(scheme_ref->mesh->cells[*i].cvolume) + ", ";
-                cells_input += vec_to_str<make<double>::vec>(this->cell_export[*i]["P"]) + ", ";
-                cells_input += vec_to_str<make<double>::vec>(this->cell_export[*i]["u"]) + ", ";
-                cells_input += vec_to_str<make<double>::vec>(this->cell_export[*i]["v"]) + ", ";
-                cells_input += vec_to_str<make<double>::vec>(this->cell_export[*i]["w"]) + ", ";
-                cells_input += vec_to_str<make<double>::vec>(this->cell_export[*i]["k"]) + ", ";
-                cells_input += vec_to_str<make<double>::vec>(this->cell_export[*i]["e"]) + ", ";
-                cells_input += vec_to_str<make<double>::vec>(this->cell_export[*i]["T"]) + ");";
-                exit = sqlite3_exec(database_p, cells_input.c_str(), NULL, 0, &message_err);
-            };
-        };
+        std::string cells_input("INSERT INTO CELLS VALUES(");
+        cells_input += std::to_string(entry_cell.first) + ", ";
+        cells_input += "'" + entry_cell.second.cdomain + "'" + ", ";
+        cells_input += vec_to_str<make<int>::vec>(entry_cell.second.cnode) + ", ";
+        cells_input += std::to_string(entry_cell.second.cvolume) + ", ";
+        cells_input += vec_to_str<make<double>::vec>(this->cell_export[entry_cell.first]["P"]) + ", ";
+        cells_input += vec_to_str<make<double>::vec>(this->cell_export[entry_cell.first]["u"]) + ", ";
+        cells_input += vec_to_str<make<double>::vec>(this->cell_export[entry_cell.first]["v"]) + ", ";
+        cells_input += vec_to_str<make<double>::vec>(this->cell_export[entry_cell.first]["w"]) + ", ";
+        cells_input += vec_to_str<make<double>::vec>(this->cell_export[entry_cell.first]["k"]) + ", ";
+        cells_input += vec_to_str<make<double>::vec>(this->cell_export[entry_cell.first]["e"]) + ", ";
+        cells_input += vec_to_str<make<double>::vec>(this->cell_export[entry_cell.first]["T"]) + ");";
+        exit = sqlite3_exec(database_p, cells_input.c_str(), NULL, 0, &message_err);
     };
     // err
     std::string err_input("INSERT INTO ERROR VALUES(");
@@ -1591,6 +1587,15 @@ void append_template(make<std::string>::vec which, V* eq, scheme*& scheme_ref, d
     };
 };
 // linear
+// virtual defines
+void linear::update_linear() {};
+void linear::calc_wall() {};
+void linear::make_linear() {};
+void linear::calc_gamma() {};
+void linear::calc_lhs() {};
+void linear::calc_rhs() {};
+void linear::calc_bound_lhs() {};
+void linear::calc_bound_rhs() {};
 // constructors
 pcorrect::pcorrect(scheme*& scheme_ref, user*& user_ref) {this->make_linear(scheme_ref, user_ref);};
 momentum::momentum(scheme*& scheme_ref, int axis_in) {this->make_linear(scheme_ref, axis_in);};
@@ -1598,7 +1603,6 @@ turb_k::turb_k(scheme*& scheme_ref) {this->make_linear(scheme_ref);};
 turb_e::turb_e(scheme*& scheme_ref) {this->make_linear(scheme_ref);};
 energy::energy(scheme*& scheme_ref, user*& user_ref) {this->make_linear(scheme_ref, user_ref);};
 s2s::s2s(scheme*& scheme_ref) {this->make_linear(scheme_ref);};
-
 // make_linear
 void pcorrect::make_linear(scheme*& scheme_ref, user*& user_ref)
 {
@@ -1764,9 +1768,9 @@ void pcorrect::calc_lhs(scheme*& scheme_ref, momentum*& u_ref, momentum*& v_ref,
             row = it.row();
         };
         // boundary
-        make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int::iterator it_bound = scheme_ref->mesh->bid["fluid"].find(row);
+        make<int>::vec bid_int_keys = get_map_keys<int, make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>(scheme_ref->mesh->bid["fluid"]);
         make<std::pair<std::string, int>>::vec fc_bound;
-        if(it_bound != scheme_ref->mesh->bid["fluid"].end())
+        if(std::find(bid_int_keys.begin(), bid_int_keys.end(), row) != bid_int_keys.end())
         {
             for(std::pair<int, make<std::pair<std::string, int>>::vec> entry : scheme_ref->mesh->bid["fluid"][row])
             {
@@ -1960,9 +1964,9 @@ void momentum::calc_lhs(scheme*& scheme_ref, momentum*& v1_ref, momentum*& v2_re
             row = it.row();
         };
         // boundary
-        make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int::iterator it_bound = scheme_ref->mesh->bid["fluid"].find(row);
+        make<int>::vec bid_int_keys = get_map_keys<int, make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>(scheme_ref->mesh->bid["fluid"]);
         make<std::pair<std::string, int>>::vec fc_bound;
-        if(it_bound != scheme_ref->mesh->bid["fluid"].end())
+        if(std::find(bid_int_keys.begin(), bid_int_keys.end(), row) != bid_int_keys.end())
         {
             for(std::pair<int, make<std::pair<std::string, int>>::vec> entry : scheme_ref->mesh->bid["fluid"][row])
             {
@@ -2032,9 +2036,9 @@ void momentum::calc_rhs(scheme*& scheme_ref, turb_k*& k_ref, momentum*& v1_ref,
             row = it.row();
         };
         // boundary
-        make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int::iterator it_bound = scheme_ref->mesh->bid["fluid"].find(row);
+        make<int>::vec bid_int_keys = get_map_keys<int, make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>(scheme_ref->mesh->bid["fluid"]);
         make<std::pair<std::string, int>>::vec fc_bound;
-        if(it_bound != scheme_ref->mesh->bid["fluid"].end())
+        if(std::find(bid_int_keys.begin(), bid_int_keys.end(), row) != bid_int_keys.end())
         {
             for(std::pair<int, make<std::pair<std::string, int>>::vec> entry : scheme_ref->mesh->bid["fluid"][row])
             {
@@ -2233,9 +2237,9 @@ void turb_k::calc_lhs(scheme*& scheme_ref, momentum*& u_ref, momentum*& v_ref, m
             row = it.row();
         };
         // boundary
-        make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int::iterator it_bound = scheme_ref->mesh->bid["fluid"].find(row);
+        make<int>::vec bid_int_keys = get_map_keys<int, make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>(scheme_ref->mesh->bid["fluid"]);
         make<std::pair<std::string, int>>::vec fc_bound;
-        if(it_bound != scheme_ref->mesh->bid["fluid"].end())
+        if(std::find(bid_int_keys.begin(), bid_int_keys.end(), row) != bid_int_keys.end())
         {
             for(std::pair<int, make<std::pair<std::string, int>>::vec> entry : scheme_ref->mesh->bid["fluid"][row])
             {
@@ -2302,9 +2306,9 @@ void turb_k::calc_rhs(scheme*& scheme_ref, turb_e*& e_ref, momentum*& u_ref,
         row = it.row();
         };
         // boundary
-        make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int::iterator it_bound = scheme_ref->mesh->bid["fluid"].find(row);
+        make<int>::vec bid_int_keys = get_map_keys<int, make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>(scheme_ref->mesh->bid["fluid"]);
         make<std::pair<std::string, int>>::vec fc_bound;
-        if(it_bound != scheme_ref->mesh->bid["fluid"].end())
+        if(std::find(bid_int_keys.begin(), bid_int_keys.end(), row) != bid_int_keys.end())
         {
             for(std::pair<int, make<std::pair<std::string, int>>::vec> entry : scheme_ref->mesh->bid["fluid"][row])
             {
@@ -2493,9 +2497,9 @@ void turb_e::calc_lhs(scheme*& scheme_ref, momentum*& u_ref, momentum*& v_ref, m
             row = it.row();
         };
         // boundary
-        make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int::iterator it_bound = scheme_ref->mesh->bid["fluid"].find(row);
+        make<int>::vec bid_int_keys = get_map_keys<int, make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>(scheme_ref->mesh->bid["fluid"]);
         make<std::pair<std::string, int>>::vec fc_bound;
-        if(it_bound != scheme_ref->mesh->bid["fluid"].end())
+        if(std::find(bid_int_keys.begin(), bid_int_keys.end(), row) != bid_int_keys.end())
         {
             for(std::pair<int, make<std::pair<std::string, int>>::vec> entry : scheme_ref->mesh->bid["fluid"][row])
             {
@@ -2562,9 +2566,9 @@ void turb_e::calc_rhs(scheme*& scheme_ref, turb_k*& k_ref, momentum*& u_ref, mom
             row = it.row();
         };
         // boundary
-        make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int::iterator it_bound = scheme_ref->mesh->bid["fluid"].find(row);
+        make<int>::vec bid_int_keys = get_map_keys<int, make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>(scheme_ref->mesh->bid["fluid"]);
         make<std::pair<std::string, int>>::vec fc_bound;
-        if(it_bound != scheme_ref->mesh->bid["fluid"].end())
+        if(std::find(bid_int_keys.begin(), bid_int_keys.end(), row) != bid_int_keys.end())
         {
             for(std::pair<int, make<std::pair<std::string, int>>::vec> entry : scheme_ref->mesh->bid["fluid"][row])
             {
@@ -2836,12 +2840,12 @@ void energy::calc_lhs(scheme*& scheme_ref, turb_k*& k_ref, momentum*& u_ref, mom
                     row = it.row();
                 };
                 // boundary
-                make<make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>::map_str::iterator it_domain = scheme_ref->mesh->bid.find("fluid");
-                if(it_domain != scheme_ref->mesh->bid.end())
+                make<std::string>::vec bid_str_keys = get_map_keys<std::string, make<make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>::map_str>(scheme_ref->mesh->bid);
+                if(std::find(bid_str_keys.begin(), bid_str_keys.end(), "fluid") != bid_str_keys.end())
                 {
-                    make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int::iterator it_bound = scheme_ref->mesh->bid["fluid"].find(row);
+                    make<int>::vec bid_int_keys = get_map_keys<int, make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>(scheme_ref->mesh->bid["fluid"]);
                     make<std::pair<std::string, int>>::vec fc_bound;
-                    if(it_bound != scheme_ref->mesh->bid[entry.first].end())
+                    if(std::find(bid_int_keys.begin(), bid_int_keys.end(), row) != bid_int_keys.end())
                     {
                         for(std::pair<int, make<std::pair<std::string, int>>::vec> entry_bound : scheme_ref->mesh->bid["fluid"][row])
                         {
@@ -2871,12 +2875,12 @@ void energy::calc_lhs(scheme*& scheme_ref, turb_k*& k_ref, momentum*& u_ref, mom
                     row = it.row();
                 };
                 // boundary
-                make<make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>::map_str::iterator it_domain = scheme_ref->mesh->bid.find("solid");
-                if(it_domain != scheme_ref->mesh->bid.end())
+                make<std::string>::vec bid_str_keys = get_map_keys<std::string, make<make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>::map_str>(scheme_ref->mesh->bid);
+                if(std::find(bid_str_keys.begin(), bid_str_keys.end(), "solid") != bid_str_keys.end())
                 {
-                    make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int::iterator it_bound = scheme_ref->mesh->bid["solid"].find(row);
+                    make<int>::vec bid_int_keys = get_map_keys<int, make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>(scheme_ref->mesh->bid["solid"]);
                     make<std::pair<std::string, int>>::vec fc_bound;
-                    if(it_bound != scheme_ref->mesh->bid[entry.first].end())
+                    if(std::find(bid_int_keys.begin(), bid_int_keys.end(), row) != bid_int_keys.end())
                     {
                         for(std::pair<int, make<std::pair<std::string, int>>::vec> entry_bound : scheme_ref->mesh->bid["solid"][row])
                         {
@@ -2975,12 +2979,12 @@ void energy::calc_rhs(scheme*& scheme_ref, momentum*& u_ref, momentum*& v_ref, m
                                                         (bf_diff.dot(Tf__) * gamma_f_[it.value()]);
                 };
                 // boundary
-                make<make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>::map_str::iterator it_domain = scheme_ref->mesh->bid.find("fluid");
-                if(it_domain != scheme_ref->mesh->bid.end())
+                make<std::string>::vec bid_str_keys = get_map_keys<std::string, make<make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>::map_str>(scheme_ref->mesh->bid);
+                if(std::find(bid_str_keys.begin(), bid_str_keys.end(), "fluid") != bid_str_keys.end())
                 {
-                    make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int::iterator it_bound = scheme_ref->mesh->bid["fluid"].find(row);
+                    make<int>::vec bid_int_keys = get_map_keys<int, make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>(scheme_ref->mesh->bid["fluid"]);
                     make<std::pair<std::string, int>>::vec fc_bound;
-                    if(it_bound != scheme_ref->mesh->bid[entry.first].end())
+                    if(std::find(bid_int_keys.begin(), bid_int_keys.end(), row) != bid_int_keys.end())
                     {
                         for(std::pair<int, make<std::pair<std::string, int>>::vec> entry_bound : scheme_ref->mesh->bid["fluid"][row])
                         {
@@ -3020,12 +3024,12 @@ void energy::calc_rhs(scheme*& scheme_ref, momentum*& u_ref, momentum*& v_ref, m
                                                         (bf_diff.dot(Tf__) * gamma_f_[it.value()]);
                 };
                 // boundary
-                make<make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>::map_str::iterator it_domain = scheme_ref->mesh->bid.find("solid");
-                if(it_domain != scheme_ref->mesh->bid.end())
+                make<std::string>::vec bid_str_keys = get_map_keys<std::string, make<make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>::map_str>(scheme_ref->mesh->bid);
+                if(std::find(bid_str_keys.begin(), bid_str_keys.end(), "solid") != bid_str_keys.end())
                 {
-                    make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int::iterator it_bound = scheme_ref->mesh->bid["solid"].find(row);
+                    make<int>::vec bid_int_keys = get_map_keys<int, make<make<make<std::pair<std::string, int>>::vec>::map_int>::map_int>(scheme_ref->mesh->bid["solid"]);
                     make<std::pair<std::string, int>>::vec fc_bound;
-                    if(it_bound != scheme_ref->mesh->bid[entry.first].end())
+                    if(std::find(bid_int_keys.begin(), bid_int_keys.end(), row) != bid_int_keys.end())
                     {
                         for(std::pair<int, make<std::pair<std::string, int>>::vec> entry_bound : scheme_ref->mesh->bid["solid"][row])
                         {
@@ -3304,9 +3308,8 @@ double quick_face_itr_value(int C_id, int F_id, V*& eq__, scheme*& scheme_ref, s
     Fgrad__ = eq__->value->cgrad[domain__][F_id];
     coor fgrad__ = eq__->value->fgrad[domain__][f_id];
     Cval__ = eq__->value->cvalue[domain__][C_id];
-    coor add = fgrad__.transpose();
-    add = add * cdCf__;
-    double get = Cval__ + add.sum() / 2;
+    double add = fgrad__.dot(cdCf__);
+    double get = Cval__ + add / 2;
     return get;
 };
 template <class V>
@@ -3501,7 +3504,7 @@ void make_transient_rhs(solver<V>* solv__, double under_relax__)
     };
 }
 template <class V>
-Eigen::VectorXf get_new_values(solver<V>* solv__, std::string what, make<double>::map_str* err_p__)
+Eigen::VectorXd get_new_values(solver<V>* solv__, std::string what, make<double>::map_str* err_p__)
 {
     Eigen::BiCGSTAB<Eigen::SparseMatrix<double, RowMajor>> solver;
     make<double>::sp_mat& lhs__ = solv__->lhs;
@@ -3516,7 +3519,7 @@ template <class V>
 void update_values(solver<V>* solv__, scheme*& scheme_ref, std::string what, make<double>::map_str* err_p__)
 {
     V*& eq__ = solv__->eq;
-    Eigen::VectorXf new_cvalues__ = get_new_values(solv__, what, err_p__);
+    Eigen::VectorXd new_cvalues__ = get_new_values(solv__, what, err_p__);
     // i.e. gradient computation
     // update cvalue -> cgrad (by iteration) -> fgrad -> fvalue
     for(std::pair<std::string, make<double>::sp_mat> entry : eq__->lhs_cc)
@@ -3696,8 +3699,8 @@ template <class V>
 double check_convergence(solver<V>* solv__)
 {
     make<double>::sp_mat lhs__ = solv__->lhs;
-    Eigen::VectorXf rhs__ = solv__->rhs;
-    Eigen::VectorXf cvalue__ = Eigen::VectorXf::Zero(solv__->rhs.rows());
+    Eigen::VectorXd rhs__ = solv__->rhs;
+    Eigen::VectorXd cvalue__ = Eigen::VectorXd(solv__->rhs.rows());
     for(std::pair<std::string, make<double>::map_int> entry1 : solv__->eq->value->cvalue)
     {
         for(std::pair<int, double> entry2 : entry1.second)
@@ -3705,7 +3708,7 @@ double check_convergence(solver<V>* solv__)
             cvalue__(entry2.first) = entry2.second;
         };
     };
-    Eigen::VectorXf x = lhs__ * cvalue__;
+    Eigen::VectorXd x = lhs__ * cvalue__;
     x = rhs__ - x;
     double res = 0.0;
     for(auto i : x)

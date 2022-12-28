@@ -90,6 +90,7 @@ struct finfo
     coor fnormal;
     coor fparallel;
     double farea;
+    std::string fboundary;
 };
 struct cinfo
 {
@@ -97,6 +98,7 @@ struct cinfo
     make<int>::vec cface;
     coor ccentroid;
     double cvolume;
+    std::string cdomain;
 };
 class minfo
 {  
