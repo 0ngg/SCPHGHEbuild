@@ -18,7 +18,7 @@ int main(int argc, char** argv)
     std::cout << "Scheme obj. successfully built." << std::endl;
     cfd::exports* main_export(new cfd::exports(output_arg, mesh_arg, main_scheme));
     std::cout << "Export obj. successfully built." << std::endl;
-    cfd::scphghe* main_scphghe(main_scheme, main_user, step_length_arg, under_relax_arg, min_res_arg, max_iter_arg);
+    cfd::scphghe* main_scphghe(new cfd::scphghe(main_scheme, main_user, step_length_arg, under_relax_arg, min_res_arg, max_iter_arg));
     std::cout << "SCPHGHE obj. successfully built." << std::endl;
     main_scphghe->iterate(main_scheme, main_export, main_user);
     std::cout << "Done." << std::endl;
