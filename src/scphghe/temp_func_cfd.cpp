@@ -1863,7 +1863,7 @@ void pcorrect::calc_rhs(scheme*& scheme_ref, momentum*& u_ref, momentum*& v_ref,
 };
 void pcorrect::calc_bound_lhs(int row, int col, std::string check, int unique, scheme*& scheme_ref, double DauC__)
 {
-    if(check.compare("ns") == 0)
+    if(check.compare("noslip") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& Tf_ = scheme_ref->mesh->geom["Tf"]["fluid"];
@@ -1874,11 +1874,11 @@ void pcorrect::calc_bound_lhs(int row, int col, std::string check, int unique, s
         coor Tf__ = Tf_.axes_to_coor(row, col);
         scheme_ref->pressure->fvalue["fluid"][col] = pc__ + (prev_pgradc__.dot(Sf__) - prev_pgradf__.dot(Tf__)) / DauC__;
     }
-    else if(check.compare("in") == 0)
+    else if(check.compare("inlet") == 0)
     {
         this->lhs_fc["fluid"].coeffRef(row, col) = scheme_ref->prop->rho["face"][col] * DauC__; 
     }
-    else if(check.compare("out") == 0)
+    else if(check.compare("outlet") == 0)
     {
         this->lhs_fc["fluid"].coeffRef(row, col) = scheme_ref->prop->rho["face"][col] * DauC__; 
     }
@@ -2081,7 +2081,7 @@ void momentum::calc_rhs(scheme*& scheme_ref, turb_k*& k_ref, momentum*& v1_ref,
 void momentum::calc_bound_lhs(int row, int col, std::string check, int unique, scheme*& scheme_ref,
                               momentum*& v1_ref, momentum*& v2_ref)
 {
-    if(check.compare("ns") == 0)
+    if(check.compare("noslip") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& eCf_ = scheme_ref->mesh->geom["eCf"]["fluid"];
@@ -2094,7 +2094,7 @@ void momentum::calc_bound_lhs(int row, int col, std::string check, int unique, s
         double d_perp__ = dCf__.dot(Sf__) / Sfval__;
         this->lhs_fc["fluid"].coeffRef(row, col) = (miu_f__ * Sfval__ * (1 - pow(eCf__(this->axis), 2)))/ d_perp__;
     }
-    else if(check.compare("out") == 0)
+    else if(check.compare("outlet") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& eCf_ = scheme_ref->mesh->geom["eCf"]["fluid"];
@@ -2126,7 +2126,7 @@ void momentum::calc_bound_lhs(int row, int col, std::string check, int unique, s
 void momentum::calc_bound_rhs(int row, int col, std::string check, int unique, scheme*& scheme_ref,
                               momentum*& v1_ref, momentum*& v2_ref)
 {
-    if(check.compare("ns") == 0)
+    if(check.compare("noslip") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& eCf_ = scheme_ref->mesh->geom["eCf"]["fluid"];
@@ -2143,7 +2143,7 @@ void momentum::calc_bound_rhs(int row, int col, std::string check, int unique, s
                                           (v2_ref->value->cvalue["fluid"][row] - v2_ref->value->fvalue["fluid"][col]) * eCf__(v2_ref->axis) * eCf__(this->axis)
                                           ) - (scheme_ref->pressure->fvalue["fluid"][col] * Sf__(this->axis));
     }
-    else if(check.compare("in") == 0)
+    else if(check.compare("inlet") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& eCf_ = scheme_ref->mesh->geom["eCf"]["fluid"];
@@ -2152,7 +2152,7 @@ void momentum::calc_bound_rhs(int row, int col, std::string check, int unique, s
         coor rho_v_sf__ = scheme_ref->source->face_value[check][unique] * eCf__;
         this->rhs_fc["fluid"].coeffRef(row, col) = scheme_ref->prop->rho["face"][col] * rho_v_sf__.dot(Sf__); 
     }
-    else if(check.compare("out") == 0)
+    else if(check.compare("outlet") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& eCf_ = scheme_ref->mesh->geom["eCf"]["fluid"];
@@ -2352,7 +2352,7 @@ void turb_k::calc_rhs(scheme*& scheme_ref, turb_e*& e_ref, momentum*& u_ref,
 void turb_k::calc_bound_lhs(int row, int col, std::string check, int unique, scheme*& scheme_ref,
                             momentum*& u_ref, momentum*& v_ref, momentum*& w_ref)
 {
-    if(check.compare("in") == 0)
+    if(check.compare("inlet") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& dCf_ = scheme_ref->mesh->geom["dCf"]["fluid"];
@@ -2360,7 +2360,7 @@ void turb_k::calc_bound_lhs(int row, int col, std::string check, int unique, sch
         coor dCf__ = dCf_.axes_to_coor(row, col);
         this->lhs_fc["fluid"].coeffRef(row, col) = this->gamma["face"]["fluid"][col] * Sf__.norm() / dCf__.norm(); 
     }
-    else if(check.compare("out") == 0)
+    else if(check.compare("outlet") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& eCf_ = scheme_ref->mesh->geom["eCf"]["fluid"];
@@ -2393,7 +2393,7 @@ void turb_k::calc_bound_lhs(int row, int col, std::string check, int unique, sch
 void turb_k::calc_bound_rhs(int row, int col, std::string check, int unique, scheme*& scheme_ref,
                             momentum*& u_ref, momentum*& v_ref, momentum*& w_ref)
 {
-    if(check.compare("in") == 0)
+    if(check.compare("inlet") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& dCf_ = scheme_ref->mesh->geom["dCf"]["fluid"];
@@ -2403,7 +2403,7 @@ void turb_k::calc_bound_rhs(int row, int col, std::string check, int unique, sch
         double inlet_k = 1/2 * 0.01 * (vf__.dot(vf__));
         this->rhs_fc["fluid"].coeffRef(row, col) = (-1) * this->gamma["face"]["fluid"][col] * Sf__.norm() * inlet_k / dCf__.norm();
     }
-    else if(check.compare("out") == 0)
+    else if(check.compare("outlet") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& eCf_ = scheme_ref->mesh->geom["eCf"]["fluid"];
@@ -2616,7 +2616,7 @@ void turb_e::calc_rhs(scheme*& scheme_ref, turb_k*& k_ref, momentum*& u_ref, mom
 void turb_e::calc_bound_lhs(int row, int col, std::string check, int unique, scheme*& scheme_ref,
                             momentum*& u_ref, momentum*& v_ref, momentum*& w_ref)
 {
-    if(check.compare("in") == 0)
+    if(check.compare("inlet") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& dCf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
@@ -2624,7 +2624,7 @@ void turb_e::calc_bound_lhs(int row, int col, std::string check, int unique, sch
         coor dCf__ = dCf_.axes_to_coor(row, col);
         this->lhs_fc["fluid"].coeffRef(row, col) = this->gamma["face"]["fluid"][col] * Sf__.norm() / dCf__.norm(); 
     }
-    else if(check.compare("out") == 0)
+    else if(check.compare("outlet") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& eCf_ = scheme_ref->mesh->geom["eCf"]["fluid"];
@@ -2657,7 +2657,7 @@ void turb_e::calc_bound_lhs(int row, int col, std::string check, int unique, sch
 void turb_e::calc_bound_rhs(int row, int col, std::string check, int unique, scheme*& scheme_ref,
                             momentum*& u_ref, momentum*& v_ref, momentum*& w_ref)
 {
-    if(check.compare("in") == 0)
+    if(check.compare("inlet") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& dCf_ = scheme_ref->mesh->geom["dCf"]["fluid"];
@@ -2672,7 +2672,7 @@ void turb_e::calc_bound_rhs(int row, int col, std::string check, int unique, sch
         double inlet_e = 0.09 * rho_f__ * pow(inlet_k, 2) / miut__;
         this->rhs_fc["fluid"].coeffRef(row, col) = (-1) * this->gamma["face"]["fluid"][col] * Sf__.norm() * inlet_e / dCf__.norm(); 
     }
-    else if(check.compare("out") == 0)
+    else if(check.compare("outlet") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& eCf_ = scheme_ref->mesh->geom["eCf"]["fluid"];
@@ -3119,7 +3119,7 @@ void energy::calc_bound_lhs(int row, int col, std::string check, int unique, sch
         double g_hamb__ = gamma_f_[col] * Sf_.axes_to_val(row, col) / dCf_.axes_to_val(row, col);
         this->lhs_fc[domain__].coeffRef(row, col) = g_hamb__ * (h_sky__ + h_conv__) * Sf_.axes_to_val(row, col) / (g_hamb__ + (h_sky__ + h_conv__) * Sf_.axes_to_val(row, col));
     }
-    else if(check.compare("out") == 0)
+    else if(check.compare("outlet") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& eCf_ = scheme_ref->mesh->geom["eCf"]["fluid"];
@@ -3158,7 +3158,12 @@ void energy::calc_bound_rhs(int row, int col, std::string check, int unique, sch
         make<double>::map_int& gamma_f_ = this->gamma["face"][domain__];
         this->rhs_fc[domain__].coeffRef(row, col) = gamma_f_[col] * Sf_.axes_to_val(row, col) * scheme_ref->source->face_value[check][unique]/ dCf_.axes_to_val(row, col);
     }
-    else if(check.compare("flux"))
+    else if(check.compare("fflux"))
+    {
+        axes& Sf_ = scheme_ref->mesh->geom["Sf"][domain__];
+        this->rhs_fc[domain__].coeffRef(row, col) = scheme_ref->source->face_value[check][unique] * Sf_.axes_to_val(row, col);
+    }
+    else if(check.compare("sflux"))
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"][domain__];
         this->rhs_fc[domain__].coeffRef(row, col) = scheme_ref->source->face_value[check][unique] * Sf_.axes_to_val(row, col);
@@ -3201,7 +3206,7 @@ void energy::calc_bound_rhs(int row, int col, std::string check, int unique, sch
         double g_hamb__ = gamma_f_[col] * Sf_.axes_to_val(row, col) / dCf_.axes_to_val(row, col);
         this->rhs_fc[domain__].coeffRef(row, col) = (-1) * g_hamb__ * (h_sky__ + h_conv__) * Sf_.axes_to_val(row, col) * T_amb__ / (g_hamb__ + (h_sky__ + h_conv__) * Sf_.axes_to_val(row, col));
     }
-    else if(check.compare("out") == 0)
+    else if(check.compare("outlet") == 0)
     {
         axes& Sf_ = scheme_ref->mesh->geom["Sf"]["fluid"];
         axes& eCf_ = scheme_ref->mesh->geom["eCf"]["fluid"];
