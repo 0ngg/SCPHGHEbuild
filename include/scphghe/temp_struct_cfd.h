@@ -81,7 +81,7 @@ class scheme
     make<double>::sp_mat rho_v_sf; // fluid, fc
     make<double>::map_int phi_v; // fluid, f
     scheme() {};
-    scheme(std::string, user*&);
+    scheme(std::string&, user*&);
 };
 struct finfo
 {
@@ -205,7 +205,7 @@ class exports
     make<int>::vec iter_export;
     exports() {};
     exports(std::string, std::string, scheme*&);
-    void update_export(scphghe*&, scheme*&, make<double>::map_str,
+    void update_export(scphghe*, scheme*&, make<double>::map_str,
                        make<double>::map_str, long long, int);
     private:
     void export_to_sql(scheme*& scheme_ref);

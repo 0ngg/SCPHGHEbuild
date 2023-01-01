@@ -144,7 +144,7 @@ make<make<std::string>::vec>::vec parse_csv(std::string filename)
     return parsed;
 };
 user::user(double P_init_in, double T_init_in, double W_init_in, std::string source_file,
-        std::string prop_solid_file): P_init(P_init_in), T_init(T_init_in), W_init(W_init_in)
+           std::string prop_solid_file): P_init(P_init_in), T_init(T_init_in), W_init(W_init_in)
 {
     this->read_source_csv(source_file);
     this->read_solid_prop_csv(prop_solid_file);
@@ -400,7 +400,7 @@ void make_cell(minfo& mesh_, cinfo cell_, make<finfo>::map_int& faces_)
     cell_.cvolume = vol;
 };
 // scheme
-scheme::scheme(std::string msh_file, user*& user_p)
+scheme::scheme(std::string& msh_file, user*& user_p)
 {
     mshio::MshSpec spec = mshio::load_msh(msh_file);
     minfo mesh_(spec); pinfo prop_(mesh_, user_p); winfo wall_(mesh_);
@@ -1319,7 +1319,7 @@ exports::exports(std::string outputname, std::string meshname, scheme*& scheme_r
     this->time_export = make<long long>::vec();
     this->iter_export = make<int>::vec();
 };
-void exports::update_export(scphghe*& scphghe_ref, scheme*& scheme_ref, make<double>::map_str err,
+void exports::update_export(scphghe* scphghe_ref, scheme*& scheme_ref, make<double>::map_str err,
                            make<double>::map_str res, long long time_iter, int outer_iter)
 {
     momentum*& u_ = scphghe_ref->solv_u->eq;
@@ -1586,7 +1586,7 @@ void append_template(make<std::string>::vec which, V* eq, scheme*& scheme_ref, d
     {
         lhs_cc_.insert({*i, make<double>::sp_mat(cc_[*i])});
         rhs_cc_.insert({*i, make<double>::sp_mat(cc_[*i].rows(), 1)});
-        std::string check(*i);
+        std::string check(*i); 
         if(check.compare("s2s") != 0)
         {
             gamma_["cell"].insert({*i, make<double>::map_int(scheme_ref->prop->rho["cell"])});
@@ -1600,7 +1600,9 @@ void append_template(make<std::string>::vec which, V* eq, scheme*& scheme_ref, d
     eq->lhs_cc = lhs_cc_; eq->rhs_cc = rhs_cc_;
     if(std::find(which.begin(), which.end(), "s2s") == which.end())
     {
-        eq->gamma = gamma_; eq->lhs_fc = lhs_fc_; eq->rhs_fc = rhs_fc_;
+        eq->lhs_fc = lhs_fc_;
+        eq->rhs_fc = rhs_fc_;
+        eq->gamma = gamma_;
     };
 };
 // linear
@@ -1629,6 +1631,7 @@ void momentum::make_linear(scheme*& scheme_ref, int axis_in)
 {
     this->axis = axis_in;
     append_template(make<std::string>::vec{"fluid"}, this, scheme_ref, 0.0);
+    std::cout << "momentum obj. made" << std::endl;
 };
 void turb_k::make_linear(scheme*& scheme_ref)
 {
@@ -3516,7 +3519,7 @@ void make_transient_rhs(solver<V>* solv__, double under_relax__)
                 {
                     if(it.row() == it.col())
                     {
-                        rhs_(it.row()) += (1 - under_relax__) * rhs_.coeffRef(it.row(), it.row()) *
+                        rhs_(it.row()) += (1 - under_relax__) * rhs_(it.row()) *
                                           solv__->eq->value->cvalue[entry_rhs.first][it.row()] / under_relax__;
 
                     };
@@ -3656,18 +3659,19 @@ template <class V>
 solver<V>::solver(V* eq, scheme*& scheme_ref, int step_length)
 {
     this->eq = eq;
-    make<double>::sp_mat lhs__; make<double>::sp_mat rhs__;
-    make<double>::sp_mat prev_lhs__; make<double>::sp_mat prev_rhs__;
-    make<sparse_input>::vec prev_lhs_input__; make<sparse_input>::vec prev_rhs_input__;
-    make<double>::map_int rho_c_ = scheme_ref->prop->rho["cell"];
-    make<double>::map_int vol_ = scheme_ref->mesh->size["volume"];
+    make<double>::sp_mat lhs__;
+    make<double>::sp_mat prev_lhs__;
+    make<double>::sp_mat rhs_mat__;
+    make<sparse_input>::vec prev_lhs_input__; make<std::pair<int, double>>::vec prev_rhs_input__;
+    make<double>::map_int& rho_c_ = scheme_ref->prop->rho["cell"];
+    make<double>::map_int& vol_ = scheme_ref->mesh->size["volume"];
     int ctd = 0;
     for(std::pair<std::string, make<double>::sp_mat> entry : this->eq->lhs_cc)
     {
         if(ctd == 0)
         {
             lhs__ = entry.second;
-            rhs__ = this->eq->rhs_cc[entry.first];
+            rhs_mat__ = this->eq->rhs_cc[entry.first];
             if(entry.first.compare("fluid") == 0)
             {
                 for(int i = 0; i < lhs__.outerSize(); i++)
@@ -3679,7 +3683,7 @@ solver<V>::solver(V* eq, scheme*& scheme_ref, int step_length)
                             double rho_c__ = rho_c_[it.row()];
                             double vol__ = vol_[it.row()];
                             sparse_input temp_lhs__(it.row(), it.row(), rho_c__ * vol__ / step_length);
-                            sparse_input temp_rhs__(it.row(), 0, rho_c__ * vol__ * eq->value->cvalue["fluid"][it.row()]/ step_length);
+                            std::pair<int, double> temp_rhs__{it.row(), rho_c__ * vol__ * eq->value->cvalue["fluid"][it.row()] / step_length};
                             prev_lhs_input__.push_back(temp_lhs__); prev_rhs_input__.push_back(temp_rhs__);
                         };
                     };
@@ -3689,7 +3693,7 @@ solver<V>::solver(V* eq, scheme*& scheme_ref, int step_length)
         else
         {
             lhs__ += entry.second;
-            rhs__ += this->eq->rhs_cc[entry.first];
+            rhs_mat__ += this->eq->rhs_cc[entry.first];
             if(entry.first.compare("fluid") == 0)
             {
                 for(int i = 0; i < lhs__.outerSize(); i++)
@@ -3701,7 +3705,7 @@ solver<V>::solver(V* eq, scheme*& scheme_ref, int step_length)
                             double rho_c__ = rho_c_[it.row()];
                             double vol__ = vol_[it.row()];
                             sparse_input temp_lhs__(it.row(), it.row(), rho_c__ * vol__ / step_length);
-                            sparse_input temp_rhs__(it.row(), 0, rho_c__ * vol__ * eq->value->cvalue["fluid"][it.row()]/ step_length);
+                            std::pair<int, double> temp_rhs__{it.row(), rho_c__ * vol__ * eq->value->cvalue["fluid"][it.row()]/ step_length};
                             prev_lhs_input__.push_back(temp_lhs__); prev_rhs_input__.push_back(temp_rhs__);
                         };
                     };
@@ -3711,9 +3715,25 @@ solver<V>::solver(V* eq, scheme*& scheme_ref, int step_length)
         ctd += 1;
     };
     prev_lhs__.setFromTriplets(prev_lhs_input__.begin(), prev_lhs_input__.end());
-    prev_rhs__.setFromTriplets(prev_rhs_input__.begin(), prev_rhs_input__.end());
-    this->lhs = lhs__; this->rhs = rhs__;
-    this->prev_lhs = prev_lhs__; this->prev_rhs = prev_rhs__;
+    Eigen::VectorXd prev_rhs__ = Eigen::VectorXd(sizeof(prev_rhs_input__));
+    Eigen::VectorXd rhs__ = Eigen::VectorXd(sizeof(prev_rhs_input__));
+    for(auto i : prev_rhs_input__)
+    {
+        prev_rhs__(i.first) = i.second;
+    };
+    for(int i = 0; i < rhs_mat__.outerSize(); i++)
+    {
+        for(make<double>::sp_mat::InnerIterator it(rhs_mat__, i); it; ++it)
+        {
+            if(it.row() == it.col())
+            {
+                rhs__(it.row()) = it.value();
+            };
+        };
+    };
+    this->lhs = lhs__; this->prev_lhs = prev_lhs__;
+    this->rhs = rhs__; this->prev_rhs = prev_rhs__;
+    std::cout << "Solver obj. made.." << std::endl;
 };
 
 // other scphghe func
@@ -3987,7 +4007,7 @@ void scphghe::iterate(scheme*& scheme_ref, exports*& export_ref, user*& user_ref
             auto duration = std::chrono::duration_cast<sec>(stop_timer - start_timer);
             long long time__ = duration.count();
             std::cout << "Exporting time step... " << this->current_time << "exec. time: " << time__ << " s" << std::endl;
-            // export_ref.update_export(*this, scheme_ref, *err_p, *res_p, time__, ctrl);
+            export_ref->update_export(this, scheme_ref, *err_p, *res_p, time__, ctrl);
             return;
         }
         else
