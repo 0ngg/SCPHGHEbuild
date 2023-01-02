@@ -1631,7 +1631,6 @@ void momentum::make_linear(scheme*& scheme_ref, int axis_in)
 {
     this->axis = axis_in;
     append_template(make<std::string>::vec{"fluid"}, this, scheme_ref, 0.0);
-    std::cout << "momentum obj. made" << std::endl;
 };
 void turb_k::make_linear(scheme*& scheme_ref)
 {
@@ -3357,6 +3356,7 @@ template <class V>
 void least_square_itr(V* eq__, scheme*& scheme_ref, std::string domain__)
 {
     // calculate cgrad with optimization [A][B] = [C]
+    std::cout << "start least_square_itr func" << std::endl;
     make<double>::sp_mat& lhs_cc_ = eq__->lhs_cc[domain__];
     axes& dCF_ = scheme_ref->mesh->geom["dCF"][domain__];
     double Cval__; double Fval__;
@@ -3364,8 +3364,8 @@ void least_square_itr(V* eq__, scheme*& scheme_ref, std::string domain__)
     int F_id;
     for(int i = 0; i < lhs_cc_.outerSize(); i++)
     {
-        Eigen::Matrix3d ls_lhs__; ls_lhs__.setZero();
-        Eigen::Vector3d ls_rhs__; ls_rhs__.setZero();
+        Eigen::Matrix3d ls_lhs__ = Eigen::Matrix3d::Zero();
+        Eigen::Vector3d ls_rhs__ = Eigen::Vector3d::Zero();
         int row;
         for(make<double>::sp_mat::InnerIterator it(lhs_cc_, i); it; ++it)
         {
@@ -3373,18 +3373,23 @@ void least_square_itr(V* eq__, scheme*& scheme_ref, std::string domain__)
             Fval__ = eq__->value->cvalue[domain__][it.col()];
             cdCF__ = dCF_.axes_to_coor(it.row(), it.col());
             wk__ = 1 / dCF_.axes_to_val(it.row(), it.col());
-            for(int j = 0; j < 2; j++)
+            for(int j = 0; j < 3; j++)
             {
-                for(int k = 0; k < 2; k++)
+                for(int k = 0; k < 3; k++)
                 {
-                    ls_lhs__(i, j) += wk__ * cdCF__(i) * cdCF__(j);
+                    double temp = ls_lhs__(i, j);
+                    ls_lhs__(i, j) = temp + wk__ * cdCF__(i) * cdCF__(j);
                 };
-                ls_rhs__(i) += wk__ * cdCF__(i) * (Fval__ - Cval__);
+                double temp = ls_rhs__(i);
+                ls_rhs__(i) = temp + wk__ * cdCF__(i) * (Fval__ - Cval__);
             };
             row = it.row();
         };
+        std::cout << "start LU decomp" << std::endl;
         Eigen::Vector3d X = ls_lhs__.lu().solve(ls_rhs__);
-        eq__->value->cgrad[domain__][row] = X.sparseView();
+        std::cout << "LU decomp done" << std::endl;
+        eq__->value->cgrad[domain__][row] = X;
+        std::cout << "append cgrad coor done" << std::endl;
     };
 };
 template <class V>
@@ -3490,20 +3495,33 @@ void make_transient_rhs(solver<V>* solv__, double under_relax__)
     make<make<double>::sp_mat>::map_str& rhs_cc_ = solv__->eq->rhs_cc;
     Eigen::VectorXd& rhs_ = solv__->rhs;
     Eigen::VectorXd& prev_rhs_ = solv__->prev_rhs;
-    for(std::pair<std::string, make<double>::sp_mat> entry_cc : solv__->eq->rhs_cc)
+    for(std::pair<std::string, make<double>::sp_mat> entry_cc : rhs_cc_)
     {
         if(ctd == 0)
         {
-            for(int i = 0; i < int(sizeof(rhs_)); i++)
+            for(int i = 0; i < entry_cc.second.outerSize(); i++)
             {
-                rhs_(i) = entry_cc.second.coeffRef(i, i) + prev_rhs_(i); 
+                for(make<double>::sp_mat::InnerIterator it(entry_cc.second, i); it; ++it)
+                {
+                    if(it.row() == it.col())
+                    {
+                        rhs_(it.row()) = it.value() + prev_rhs_(it.row());
+                    };
+                };
             };
         }
         else
         {
-            for(int i = 0; i < int(sizeof(rhs_)); i++)
+            for(int i = 0; i < entry_cc.second.outerSize(); i++)
             {
-                rhs_(i) += entry_cc.second.coeffRef(i, i);
+                for(make<double>::sp_mat::InnerIterator it(entry_cc.second, i); it; ++it)
+                {
+                    if(it.row() == it.col())
+                    {
+                        double temp = rhs_(it.row());
+                        rhs_(it.row()) = temp + it.value();
+                    };
+                };
             };
         };
         ctd += 1;
@@ -3519,9 +3537,9 @@ void make_transient_rhs(solver<V>* solv__, double under_relax__)
                 {
                     if(it.row() == it.col())
                     {
-                        rhs_(it.row()) += (1 - under_relax__) * rhs_(it.row()) *
+                        double temp = rhs_(it.row());
+                        rhs_(it.row()) = temp + (1 - under_relax__) * temp *
                                           solv__->eq->value->cvalue[entry_rhs.first][it.row()] / under_relax__;
-
                     };
                 };
             };
@@ -3531,11 +3549,17 @@ void make_transient_rhs(solver<V>* solv__, double under_relax__)
 template <class V>
 Eigen::VectorXd get_new_values(solver<V>* solv__, std::string what, make<double>::map_str* err_p__)
 {
-    Eigen::BiCGSTAB<Eigen::SparseMatrix<double, RowMajor>> solver;
+    std::cout << "start BiCGSTAB" << std::endl;
+    Eigen::BiCGSTAB<make<double>::sp_mat> solver;
     make<double>::sp_mat& lhs__ = solv__->lhs;
     Eigen::VectorXd& rhs__ = solv__->rhs;
     solver.compute(lhs__);
-    Eigen::VectorXd x = solver.solve(rhs__);
+    std::cout << "compute BiCGSTAB done" << std::endl;
+    std::cout << "lhs rows, cols: " << lhs__.rows() << " " << lhs__.cols() << std::endl;
+    std::cout << "rhs rows, cols: " << rhs__.rows() << " " << rhs__.cols() << std::endl;
+    Eigen::VectorXd x = Eigen::VectorXd(rhs__.rows());
+    x = solver.solve(rhs__);
+    std::cout << "solve BiCGSTAB done" << std::endl;
     make<double>::map_str& err__ = *err_p__;
     err__[what] = solver.error();
     return x;
@@ -3544,27 +3568,36 @@ template <class V>
 void update_values(solver<V>* solv__, scheme*& scheme_ref, std::string what, make<double>::map_str* err_p__)
 {
     V*& eq__ = solv__->eq;
+    std::cout << "start get_new_values" << std::endl;
     Eigen::VectorXd new_cvalues__ = get_new_values(solv__, what, err_p__);
+    std::cout << "get_new_values done" << std::endl;
     // i.e. gradient computation
     // update cvalue -> cgrad (by iteration) -> fgrad -> fvalue
-    for(std::pair<std::string, make<double>::sp_mat> entry : eq__->lhs_cc)
+    for(std::pair<std::string, make<double>::sp_mat> entry_str : eq__->lhs_cc)
     {
-        make<double>::map_int& cvalue_ = eq__->value->cvalue[entry.first];
-        make<int>::sp_mat& cc_fc_ = scheme_ref->mesh->cc_fc[entry.first];
-        for(std::pair<int, double> entry : eq__->value->cvalue[entry.first])
+        make<double>::map_int& cvalue_ = eq__->value->cvalue[entry_str.first];
+        make<int>::sp_mat& cc_fc_ = scheme_ref->mesh->cc_fc[entry_str.first];
+        for(std::pair<int, double> entry_int : eq__->value->cvalue[entry_str.first])
         {
-            entry.second = new_cvalues__(entry.first);
+            eq__->value->cvalue[entry_str.first][entry_int.first] = new_cvalues__(entry_int.first);
+            std::cout << "entry_int cvalue update with new_cvalues__ done" << std::endl;
         };
-        least_square_itr(eq__, scheme_ref, entry.first);
+        std::cout << "start least square iter" << std::endl;
+        least_square_itr(eq__, scheme_ref, entry_str.first);
+        std::cout << "least square iter done" << std::endl;
         for(int i = 0; i < cc_fc_.outerSize(); i++)
         {
             for(make<int>::sp_mat::InnerIterator it(cc_fc_, i); it; ++it)
             {
-                coor face_itr_grad__ = quick_face_itr_grad(it.row(), it.col(), eq__, scheme_ref, entry.first);
-                eq__->value->fgrad[entry.first][it.value()](0) = face_itr_grad__(0);
-                eq__->value->fgrad[entry.first][it.value()](1) = face_itr_grad__(1);
-                eq__->value->fgrad[entry.first][it.value()](2) = face_itr_grad__(2);
-                eq__->value->fvalue[entry.first][it.value()] = quick_face_itr_value(it.row(), it.col(), eq__, scheme_ref, entry.first);;
+                std::cout << "start quick_face_itr_grad" << std::endl;
+                coor face_itr_grad__ = quick_face_itr_grad(it.row(), it.col(), eq__, scheme_ref, entry_str.first);
+                std::cout << "quick_face_itr_grad done" << std::endl;
+                eq__->value->fgrad[entry_str.first][it.value()](0) = face_itr_grad__(0);
+                eq__->value->fgrad[entry_str.first][it.value()](1) = face_itr_grad__(1);
+                eq__->value->fgrad[entry_str.first][it.value()](2) = face_itr_grad__(2);
+                std::cout << "fgrad coor update done" << std::endl;
+                eq__->value->fvalue[entry_str.first][it.value()] = quick_face_itr_value(it.row(), it.col(), eq__, scheme_ref, entry_str.first);
+                std::cout << "fvalue update done" << std::endl;
             };
         };
     };
@@ -3733,7 +3766,6 @@ solver<V>::solver(V* eq, scheme*& scheme_ref, int step_length)
     };
     this->lhs = lhs__; this->prev_lhs = prev_lhs__;
     this->rhs = rhs__; this->prev_rhs = prev_rhs__;
-    std::cout << "Solver obj. made.." << std::endl;
 };
 
 // other scphghe func
@@ -3808,8 +3840,11 @@ int scphghe::SIMPLE_loop(scheme*& scheme_ref, bool is_init, make<double>::map_st
         passes += 1;
         // momentum
         u_->update_linear(scheme_ref, k_, v_, w_);
+        std::cout << "update_linear done" << std::endl;
         make_transient_lhs<momentum>(this->solv_u, this->under_relax);
+        std::cout << "make_transient_lhs done" << std::endl;
         make_transient_rhs<momentum>(this->solv_u, this->under_relax);
+        std::cout << "make_transient_rhs done" << std::endl;
         v_->update_linear(scheme_ref, k_, u_, w_);
         make_transient_lhs<momentum>(this->solv_v, this->under_relax);
         make_transient_rhs<momentum>(this->solv_v, this->under_relax);
@@ -3817,12 +3852,15 @@ int scphghe::SIMPLE_loop(scheme*& scheme_ref, bool is_init, make<double>::map_st
         make_transient_lhs<momentum>(this->solv_w, this->under_relax);
         make_transient_rhs<momentum>(this->solv_w, this->under_relax);
         update_values<momentum>(this->solv_u, scheme_ref, std::string("u"), err_p__);
+        std::cout << "update_values done" << std::endl;
         res_u = check_convergence<momentum>(this->solv_u);
+        std::cout << "check_convergence done" << std::endl;
         update_values<momentum>(this->solv_v, scheme_ref, std::string("v"), err_p__);
         res_v = check_convergence<momentum>(this->solv_v);
         update_values<momentum>(this->solv_w, scheme_ref, std::string("w"), err_p__);
         res_w = check_convergence<momentum>(this->solv_w);
         u_->calc_wall(scheme_ref, v_, w_);
+        std::cout << "calc_wall done" << std::endl;
         v_->calc_wall(scheme_ref, u_, w_);
         w_->calc_wall(scheme_ref, u_, v_);
         // pcor
@@ -3832,6 +3870,7 @@ int scphghe::SIMPLE_loop(scheme*& scheme_ref, bool is_init, make<double>::map_st
         update_values<pcorrect>(this->solv_pcor, scheme_ref, std::string("pcor"), err_p__);
         res_pcor = check_convergence<pcorrect>(this->solv_pcor);
         pcor_->update_correction(scheme_ref, u_, v_, w_);
+        std::cout << "update_correction done" << std::endl;
         // new cvalue, old lhs - rhs
         if(res_u <= this->min_residual && res_v <= this->min_residual &&
            res_w <= this->min_residual && res_pcor <= this->min_residual)
@@ -3842,10 +3881,12 @@ int scphghe::SIMPLE_loop(scheme*& scheme_ref, bool is_init, make<double>::map_st
                 make_prev_lhs<momentum>(this->solv_v, scheme_ref, this->step_length, is_init);
                 make_prev_lhs<momentum>(this->solv_w, scheme_ref, this->step_length, is_init);
                 make_prev_lhs<pcorrect>(this->solv_pcor, scheme_ref, this->step_length, is_init);
+                std::cout << "make_prev_lhs done" << std::endl;
                 make_prev_rhs<momentum>(this->solv_u, scheme_ref, this->step_length, is_init);
                 make_prev_rhs<momentum>(this->solv_v, scheme_ref, this->step_length, is_init);
                 make_prev_rhs<momentum>(this->solv_w, scheme_ref, this->step_length, is_init);
                 make_prev_rhs<pcorrect>(this->solv_pcor, scheme_ref, this->step_length, is_init);
+                std::cout << "make_prev_rhs done" << std::endl;
                 make<double>::map_str& res__ = *res_p__;
                 res__["u"] = res_u; res__["v"] = res_v; res__["w"] = res_w; res__["pcor"] = res_pcor;
                 return ctrl;
@@ -3984,14 +4025,17 @@ void scphghe::iterate(scheme*& scheme_ref, exports*& export_ref, user*& user_ref
     int passes = 0;
     user_ref->update_source(this->current_time, scheme_ref);
     double AH = user_ref->W_init;
-    std::cout << "Start time step iteration..." << this->current_time << std::endl; 
+    std::cout << "Start time step iteration... " << this->current_time << std::endl; 
     while(ctrl < this->max_iter)
     {
         auto start_timer = std::chrono::high_resolution_clock::now();
+        std::cout << "Start SIMPLE loop... " << this->current_time << " " << ctrl << std::endl;
         passes += SIMPLE_loop(scheme_ref, is_init, err_p, res_p);
         std::cout << "SIMPLE loop done. " << "[" << ctrl << "]" << std::endl;
+        std::cout << "Start turbulence loop... " << this->current_time << " " << ctrl << std::endl;
         passes += turb_loop(scheme_ref, is_init, err_p, res_p);
         std::cout << "Turbulence loop done. " << "[" << ctrl << "]" << std::endl;
+        std::cout << "Start energy loop... " << this->current_time << " " << ctrl << std::endl;
         passes += energy_loop(scheme_ref, AH, is_init, err_p, res_p);
         std::cout << "Energy loop done. " << "[" << ctrl << "]" << std::endl;
         if(passes < 5)
